@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/couchbaselabs/gocb"
+	"github.com/couchbase/gocb"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -23,7 +23,7 @@ func executeTemplate(w http.ResponseWriter, name string, data interface{}) {
 		tmpls = make(map[string]*template.Template)
 	}
 	if tmpls[name] == nil {
-		tmpls[name] = template.Must(template.ParseFiles("tmpls/"+name, "tmpls/"+"layout.html"))
+		tmpls[name] = template.Must(template.ParseFiles("/deployment/tmpls/"+name, "/deployment/tmpls/layout.html"))
 	}
 	tmpls[name].ExecuteTemplate(w, "base", data)
 }
@@ -107,7 +107,7 @@ type tdBeerIndex struct {
 
 func beerIndexHandler(w http.ResponseWriter, r *http.Request) {
 	vq := gocb.NewViewQuery("beer", "by_name").Limit(entriesPerPage).Stale(gocb.Before)
-	rows := bucket.ExecuteViewQuery(vq)
+	rows, _ := bucket.ExecuteViewQuery(vq)
 	var row beerByNameRow
 	var beers []Beer
 	for rows.Next(&row) {
@@ -138,7 +138,7 @@ func beerSearchHandler(w http.ResponseWriter, r *http.Request) {
 	vq := gocb.NewViewQuery("beer", "by_name").Limit(entriesPerPage).Stale(gocb.Before)
 	vq.Range(value, value+"\u0FFFF", false)
 
-	rows := bucket.ExecuteViewQuery(vq)
+	rows, _ := bucket.ExecuteViewQuery(vq)
 	var row beerByNameRow
 	var beers []Beer
 	for rows.Next(&row) {
@@ -255,7 +255,7 @@ type tdBrewIndex struct {
 
 func brewIndexHandler(w http.ResponseWriter, r *http.Request) {
 	vq := gocb.NewViewQuery("brewery", "by_name").Limit(entriesPerPage)
-	rows := bucket.ExecuteViewQuery(vq)
+	rows, _ := bucket.ExecuteViewQuery(vq)
 	var row breweryByNameRow
 	var breweries []Brewery
 	for rows.Next(&row) {
@@ -277,7 +277,7 @@ func brewSearchHandler(w http.ResponseWriter, r *http.Request) {
 	vq := gocb.NewViewQuery("brewery", "by_name").Limit(entriesPerPage)
 	vq.Range(value, value+"\u0FFFF", false)
 
-	rows := bucket.ExecuteViewQuery(vq)
+	rows, _ := bucket.ExecuteViewQuery(vq)
 	var row breweryByNameRow
 	var breweries []Brewery
 	for rows.Next(&row) {
@@ -328,8 +328,11 @@ func brewShowHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	cluster, _ := gocb.Connect("couchbase://127.0.0.1")
-	bucket, _ = cluster.OpenBucket("beer-sample", "")
+
+	gocb.SetLogger(gocb.VerboseStdioLogger())
+
+	cluster, _ := gocb.Connect("http://couchbase-server:8091")
+	bucket, _ = cluster.OpenBucket("beer-sample", "password")
 
 	http.HandleFunc("/", welcomeHandler)
 	http.HandleFunc("/beers", beerIndexHandler)
@@ -343,9 +346,9 @@ func main() {
 	http.HandleFunc("/breweries/show/", brewShowHandler)
 	http.HandleFunc("/breweries/delete/", removeHandler)
 
-	http.Handle("/css/", http.FileServer(http.Dir("static/")))
-	http.Handle("/js/", http.FileServer(http.Dir("static/")))
+	http.Handle("/css/", http.FileServer(http.Dir("/deployment/static")))
+	http.Handle("/js/", http.FileServer(http.Dir("/deployment/static")))
 
-	fmt.Printf("Starting server on :9980\n")
-	http.ListenAndServe(":9980", nil)
+	fmt.Printf("Starting server on :8080\n")
+	http.ListenAndServe(":8080", nil)
 }
